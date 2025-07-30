@@ -80,6 +80,21 @@ export function createAnthropic(
     const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
     if (oauthToken) {
       headers['Authorization'] = `Bearer ${oauthToken}`;
+      headers['x-app'] = 'cli';
+      headers['User-Agent'] = 'claude-cli/1.0.63 (external, cli)';
+      headers['Accept'] = 'application/json';
+      headers['accept-language'] = '*';
+      headers['anthropic-dangerous-direct-browser-access'] = 'true';
+      headers['sec-fetch-mode'] = 'cors';
+      headers['X-Stainless-Arch'] = 'arm64';
+      headers['x-stainless-helper-method'] = 'stream';
+      headers['X-Stainless-Lang'] = 'js';
+      headers['X-Stainless-OS'] = 'MacOS';
+      headers['X-Stainless-Package-Version'] = '0.55.1';
+      headers['X-Stainless-Retry-Count'] = '0';
+      headers['X-Stainless-Runtime'] = 'node';
+      headers['X-Stainless-Runtime-Version'] = 'v22.14.0';
+      headers['X-Stainless-Timeout'] = '60';
     } else if (options.apiKey || process.env.ANTHROPIC_API_KEY) {
       // Fallback to traditional API key
       headers['x-api-key'] = loadApiKey({

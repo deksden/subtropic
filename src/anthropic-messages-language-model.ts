@@ -360,10 +360,13 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV2 {
     betas: Set<string>;
     headers: Record<string, string | undefined> | undefined;
   }) {
-    // Add OAuth beta if using Claude Code OAuth token
+    // Add OAuth betas if using Claude Code OAuth token
     const allBetas = new Set(betas);
     if (process.env.CLAUDE_CODE_OAUTH_TOKEN) {
+      allBetas.add('claude-code-20250219');
       allBetas.add('oauth-2025-04-20');
+      allBetas.add('interleaved-thinking-2025-05-14');
+      allBetas.add('fine-grained-tool-streaming-2025-05-14');
     }
 
     return combineHeaders(
@@ -374,10 +377,16 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV2 {
   }
 
   private buildRequestUrl(isStreaming: boolean): string {
-    return (
-      this.config.buildRequestUrl?.(this.config.baseURL, isStreaming) ??
-      `${this.config.baseURL}/messages`
-    );
+    let baseUrl = this.config.buildRequestUrl?.(this.config.baseURL, isStreaming) ??
+      `${this.config.baseURL}/messages`;
+    
+    // Add beta=true parameter for OAuth authentication
+    if (process.env.CLAUDE_CODE_OAUTH_TOKEN) {
+      const separator = baseUrl.includes('?') ? '&' : '?';
+      baseUrl = `${baseUrl}${separator}beta=true`;
+    }
+    
+    return baseUrl;
   }
 
   private transformRequestBody(args: Record<string, any>): Record<string, any> {
@@ -436,13 +445,23 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV2 {
     // Extract citation documents for response processing
     const citationDocuments = this.extractCitationDocuments(options.prompt);
 
+    const requestHeaders = await this.getHeaders({ betas, headers: options.headers });
+    const requestUrl = this.buildRequestUrl(false);
+    
+    // Log request details if debug mode is enabled
+    if (process.env.ANTHROPIC_DEBUG === 'true' || process.env.CLAUDE_CODE_DEBUG === 'true') {
+      console.log('🚀 Anthropic API Request');
+      console.log('📍 URL:', requestUrl);
+      console.log('📋 Headers:', JSON.stringify(requestHeaders, null, 2));
+    }
+
     const {
       responseHeaders,
       value: response,
       rawValue: rawResponse,
     } = await postJsonToApi({
-      url: this.buildRequestUrl(false),
-      headers: await this.getHeaders({ betas, headers: options.headers }),
+      url: requestUrl,
+      headers: requestHeaders,
       body: this.transformRequestBody(args),
       failedResponseHandler: anthropicFailedResponseHandler,
       successfulResponseHandler: createJsonResponseHandler(
@@ -620,10 +639,19 @@ export class AnthropicMessagesLanguageModel implements LanguageModelV2 {
     const citationDocuments = this.extractCitationDocuments(options.prompt);
 
     const body = { ...args, stream: true };
+    const requestHeaders = await this.getHeaders({ betas, headers: options.headers });
+    const requestUrl = this.buildRequestUrl(true);
+    
+    // Log streaming request details if debug mode is enabled
+    if (process.env.ANTHROPIC_DEBUG === 'true' || process.env.CLAUDE_CODE_DEBUG === 'true') {
+      console.log('🌊 Anthropic API Streaming Request');
+      console.log('📍 URL:', requestUrl);
+      console.log('📋 Headers:', JSON.stringify(requestHeaders, null, 2));
+    }
 
     const { responseHeaders, value: response } = await postJsonToApi({
-      url: this.buildRequestUrl(true),
-      headers: await this.getHeaders({ betas, headers: options.headers }),
+      url: requestUrl,
+      headers: requestHeaders,
       body: this.transformRequestBody(body),
       failedResponseHandler: anthropicFailedResponseHandler,
       successfulResponseHandler: createEventSourceResponseHandler(
